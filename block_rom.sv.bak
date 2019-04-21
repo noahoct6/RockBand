@@ -1,0 +1,8 @@
+module 	block_rom(input  addr,
+						 output [31:0]
+						 );
+
+parameter ADDR_WIDTH =  ;
+parameter DATA_WIDTH =  32;
+
+endmodule
