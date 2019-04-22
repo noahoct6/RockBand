@@ -1,7 +1,0 @@
-module 	stat_rects(input Clk,
-						  input [9:0] DrawX, DrawY,
-						  output is_statrect
-						  );
-						  
-
-endmodule
