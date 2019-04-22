@@ -56,7 +56,7 @@ begin
 	tl_write = 1'b0;
 	tl_addr = 32'd0;
 	done = 1'b0;
-	waitin = 1'b0;
+	waiting = 1'b0;
 	
 	Next_state = State;
 	

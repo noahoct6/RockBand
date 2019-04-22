@@ -44,14 +44,23 @@ logic [31:0] tl_a, tl_wd, tl_rd, sample;
 logic [7:0] keyData, keyTrack;
 logic [9:0] drawx, drawy, p1_sc, p2_sc;
 logic is_num;
-logic [7:0] is_sr;
+logic [7:0] is_sr, is_fb;
+logic [11:0] p1_d, p2_d;
+logic [7:0] inc2, inc1;
+logic ld_sc2, ld_sc1;
+
+logic [3:0][359:0] n_reg;
 		
 assign Reset = ~KEY[0];
 assign LEDG[8] = tl_rdv;
-assign LEDG[0] = INIT;
-assign LEDG[1] = INIT_FINISH;
-assign LEDG[2] = data_over;
-assign LEDG[3] = is_sr;
+
+//logic p1_delayed, p1_re, p2_delayed, p2_re;
+//always_ff @ (posedge CLOCK_50) begin
+//	p1_delayed <= ~KEY[2];
+//   p1_re <= (~KEY[2] == 1'b1) && (p1_delayed == 1'b0);
+//	p2_delayed <= ~KEY[1];
+//   p2_re <= (~KEY[1] == 1'b1) && (p2_delayed == 1'b0);
+//end
 
 finalproject_soc 	 fpinst(.clk_clk(CLOCK_50),   				// SDRAM control signals from top level
 								  .reset_reset_n(~Reset),
@@ -101,8 +110,9 @@ key_reg				kr_inst(.Clk(CLOCK_50),			// master clock
 								  .Reset(Reset),			// master reset
 								  .press(press),			// whether the key was pressed or released
 								  .keyData(keyData),		// most recent key pressed
-								  .keyTrack(keyTrack)	// decoder of the which keys are pressed
+								  .keyTrack(keyTrack)	// decoder of the which keys are pressed, put keyTrack in
 								  );
+
 		
 audio_interface  	 	 AUD(.clk(CLOCK_50),    		   	// master clock
 							     .Reset(Reset), 						// master reset
@@ -146,7 +156,9 @@ score_disp 		score_inst(.Clk(CLOCK_50),
 								  .frame_clk(VGA_VS),
 								  .DrawX(drawx),
 								  .DrawY(drawy),
-								  .is_num(is_num)
+								  .is_num(is_num),
+								  .p1_dec(p2_d),
+								  .p2_dec(p1_d)
 								  );
 								 
 stat_rects        sr_inst(.Clk(CLOCK_50),
@@ -156,18 +168,43 @@ stat_rects        sr_inst(.Clk(CLOCK_50),
 								  .is_sr(is_sr)
 								  );
 								  
+fb_mapper		  fbm_inst(.Clk(CLOCK_50),
+								  .DrawX(drawx),
+								  .DrawY(drawy),
+								  .n_reg(n_reg),
+								  .is_fb(is_fb)
+								  );
+								  
 color_mapper 		cm_inst(.DrawX(drawx),
 								  .DrawY(drawy),
 								  .is_num(is_num),
 								  .is_sr(is_sr),
+								  .is_fb(is_fb),
 								  .VGA_R(VGA_R),
 								  .VGA_G(VGA_G),
 								  .VGA_B(VGA_B),
 								  .keyTrack(keyTrack)
 								  );
+								  
+note_reg 			nr_inst(.frame_clk(VGA_VS),
+								  .notes({sample[28],sample[24],sample[20],sample[16]}),
+								  .n_reg(n_reg)
+								  );
 		
-inc_10			  p1_score(.Clk(CLOCK_50), .Reset(Reset), .inc(), .Dout(p1_sc));
-inc_10			  p2_score(.Clk(CLOCK_50), .Reset(Reset), .inc(), .Dout(p2_sc));
+scorer 		  scorer_inst(.Clk(CLOCK_50), 
+								  .keyTrack(keyTrack), 
+								  .n_reg(n_reg), 
+								  .inc1(inc1), 
+								  .inc2(inc2), 
+								  .ld_sc1(ld_sc1),
+								  .ld_sc2(ld_sc2)
+								  );		
+		
+inc_10			  p1_score(.Clk(CLOCK_50), .ld(ld_sc1), .Reset(Reset), .inc(inc1), .Dout(p1_sc));
+inc_10			  p2_score(.Clk(CLOCK_50), .ld(ld_sc2), .Reset(Reset), .inc(inc2), .Dout(p2_sc));
+
+BCD					 p1_dec(.bin(p1_sc), .dec(p1_d));
+BCD					 p2_dec(.bin(p2_sc), .dec(p2_d));
 		
 hexdriver		  HEX_0(.In({3'b0,keyTrack[0]}), .Out(HEX0));
 hexdriver		  HEX_1(.In({3'b0,keyTrack[1]}), .Out(HEX1));							
@@ -185,6 +222,6 @@ hexdriver		  HEX_7(.In({3'b0,keyTrack[7]}), .Out(HEX7));
 //hexdriver		  HEX_4(.In(4'b0), .Out(HEX4));
 //hexdriver		  HEX_5(.In(4'b0), .Out(HEX5));
 //hexdriver		  HEX_6(.In(4'b0), .Out(HEX6));
-//hexdriver		  HEX_7(.In(4'b0), .Out(HEX7));								  
-					 
+//hexdriver		  HEX_7(.In(4'b0), .Out(HEX7));		
+
 endmodule

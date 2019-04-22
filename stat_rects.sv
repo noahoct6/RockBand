@@ -1,7 +1,7 @@
-module 	stat_rects(input Clk,
-						  input [9:0] DrawX, DrawY,
-						  input [7:0] keyTrack,
-						  output [7:0] is_sr
+module 	stat_rects(input logic Clk,
+						  input logic [9:0] DrawX, DrawY,
+						  input logic [7:0] keyTrack,
+						  output logic [7:0] is_sr
 						  );
 						  
 logic [10:0] b7x = 64; // left most rect
@@ -12,7 +12,7 @@ logic [10:0] b3x = 382;
 logic [10:0] b2x = 436;
 logic [10:0] b1x = 490;
 logic [10:0] b0x = 544;	// right most rect
-logic [10:0] y   = 360; // y displacement
+logic [10:0] y   = 359; // y displacement, used to be 360
 
 logic b7,b6,b5,b4,b3,b2,b1,b0;
 				  
@@ -21,7 +21,7 @@ logic [31:0]  rect_data;
 block_rom	(.addr(rect_addr), .data(rect_data));
 
 logic [10:0] offset7,offset6,offset5,offset4,offset3,offset2,offset1,offset0;
-assign offset7 = 'd18 + {10{keyTrack[7]}} & 'd18;
+assign offset7 = 'd18 + ({10{keyTrack[7]}} & 'd18);
 assign offset6 = 'd18 + ({10{keyTrack[6]}} & 'd18);
 assign offset5 = 'd18 + ({10{keyTrack[5]}} & 'd18);
 assign offset4 = 'd18 + ({10{keyTrack[4]}} & 'd18);
@@ -145,7 +145,7 @@ begin : get_Y
 					b3 = 1'b0;
 					b2 = 1'b0;
 					b1 = 1'b0;
-					b0 = 1'b1;
+					b0 = 1'b0;
 					rect_addr = 'h0;
 				end
 end
