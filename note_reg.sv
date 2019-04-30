@@ -1,11 +1,14 @@
 // A shift register that keeps the upper left corners of the falling blocks.
 // Shifts down on frame_clk and synchronizes the frame clock with the 44100 Hz audio clock.
 module	note_reg(input logic frame_clk,
-						input logic [3:0] notes,
+						input logic [3:0] notes_in,
+						input logic nah,
 						output logic [3:0][359:0] n_reg
 						);
 			
 logic n3,n2,n1,n0;
+logic [3:0] notes;
+assign notes = notes_in & {4{nah}};
 			
 always_ff @ (posedge frame_clk, posedge notes[3]) //synchronizes two clocks
 begin

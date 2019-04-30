@@ -10,13 +10,12 @@
 module Dreg ( input Clk, Load, Reset, D,
 				  output logic Q );
 				  
-always @ (posedge Clk or posedge Reset ) 
+always_ff @ (posedge Clk or posedge Reset ) 
 begin 
-	Q = Q;
 	if (Reset) 
-		Q = 1'b0;
+		Q <= 1'b0;
 	else if (Load) 
-		Q = D;
+		Q <= D;
 end
 
 endmodule

@@ -1,30 +1,21 @@
-/* SpriteParser.c - Parses the t files from matlab into an MIF file format
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 
-#define INPUT_FILE "audio_files/furelise.wav"			// Input filename
-#define OUTPUT_FILE "generated_RAM/furelise.ram"		// Name of file to output to
-#define NUM_COLORS 	4								// Total number of different colors
-#define WIDTH		8
-#define DEPTH		3072
+#define INPUT_FILE "audio_files/furelise.wav"
+#define OUTPUT_FILE "generated_RAM/furelise.ram"
 
 int addr = 0;
 
+// actual sampling frequency is 49300 for audio codec
+
 int main()
 {
-	char line[21];
 	FILE *in = fopen(INPUT_FILE, "rb");
 	FILE *out = fopen(OUTPUT_FILE, "wb");
-	size_t num_chars = 20;
-	long value = 0;
 	int i;
-	int *p;
 	unsigned int get_size;
 	unsigned short check = 10;
 	int sample;
-	int read;
 
 	if(!in)
 	{
@@ -42,7 +33,12 @@ int main()
 
 	printf("NumSamples: %i", num_samples);
 
+	unsigned int zeros = 0;
+	num_samples+=294600;//269100;
 	fwrite(&num_samples,4,1,out);
+	for(i=0;i<294600;i++){
+		fwrite(&zeros,4,1,out);
+	}
 
 	for(i=0;i<num_samples;i++){
 		fread(&sample,1,4,in);
@@ -51,14 +47,6 @@ int main()
 		//printf("%i\n",sample);
 		fwrite(&sample,4,1,out);
 	}
-
-	// Get a line, convert it to an integer, and compare it to the palette values.
-	// while(fgets(line, num_chars, in) != NULL)
-	// {
-	// 	value = (char)strtol(line, NULL, 10);
-	// 	p = (int *)&value;
-	// 	fwrite(p, 2, 1, out);
-	// }
 
 	fclose(out);
 	fclose(in);

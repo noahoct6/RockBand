@@ -12,6 +12,11 @@ module  color_mapper (input        [9:0] DrawX, DrawY,       // Current pixel co
     assign VGA_G = Green;
     assign VGA_B = Blue;
 	 
+	 logic [0:639] slice;
+	 frame_rom(.addr(DrawY),.data(slice));
+	 logic pick;
+	 assign pick = slice[DrawX];
+	 
     always_comb
     begin
         if (is_num == 1'b1) 
@@ -210,10 +215,10 @@ module  color_mapper (input        [9:0] DrawX, DrawY,       // Current pixel co
         else 
         begin
             // Background with nice color gradient, black right now
-            Red = 8'd0;
-				Green = 8'd0;
+            Red = {{4{pick}},4'd0};
+				Green = {{4{pick}},4'd0};
             //Green = 8'h88 + {1'b0,DrawY[9:3]};
-            Blue = 8'd0;
+            Blue = {{4{pick}},4'd0};
         end
     end 
     

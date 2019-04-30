@@ -39,28 +39,22 @@ module rockband(input logic CLOCK_50,
 					 output logic 			I2C_SCLK
 					 );
 
-logic press, Reset, INIT, INIT_FINISH, tl_r, tl_w, tl_rdv, data_over, done, waiting;
+logic press, Reset, INIT, INIT_FINISH, tl_r, tl_w, tl_rdv, data_over, done;
 logic [31:0] tl_a, tl_wd, tl_rd, sample;
 logic [7:0] keyData, keyTrack;
 logic [9:0] drawx, drawy, p1_sc, p2_sc;
 logic is_num;
 logic [7:0] is_sr, is_fb;
 logic [11:0] p1_d, p2_d;
-logic [7:0] inc2, inc1;
-logic ld_sc2, ld_sc1;
+logic [7:0] inc2, inc1, byte1_i, byte2_i, byte1_o, byte2_o;
+logic ld_sc2, ld_sc1, PS2_DAT_S, PS2_CLK_S;
+logic nah, waiting, check;
 
 logic [3:0][359:0] n_reg;
 		
 assign Reset = ~KEY[0];
 assign LEDG[8] = tl_rdv;
 
-//logic p1_delayed, p1_re, p2_delayed, p2_re;
-//always_ff @ (posedge CLOCK_50) begin
-//	p1_delayed <= ~KEY[2];
-//   p1_re <= (~KEY[2] == 1'b1) && (p1_delayed == 1'b0);
-//	p2_delayed <= ~KEY[1];
-//   p2_re <= (~KEY[1] == 1'b1) && (p2_delayed == 1'b0);
-//end
 
 finalproject_soc 	 fpinst(.clk_clk(CLOCK_50),   				// SDRAM control signals from top level
 								  .reset_reset_n(~Reset),
@@ -84,6 +78,7 @@ finalproject_soc 	 fpinst(.clk_clk(CLOCK_50),   				// SDRAM control signals fro
 								  
 game_controller   gc_inst(.Clk(CLOCK_50),
 								  .Reset(Reset),
+								  .SW(SW[0]),
 								  .Start(~KEY[3]),
 								  .INIT_FINISH(INIT_FINISH),
 								  .INIT(INIT),
@@ -93,18 +88,31 @@ game_controller   gc_inst(.Clk(CLOCK_50),
 								  .tl_addr(tl_a),
 								  .sample(sample),
 								  .tl_rdv(tl_rdv),
-								  .aud_clk(AUD_XCK), // or XCK
+								  .aud_clk(AUD_XCK),
 								  .done(done),
-								  .waiting(waiting)
+								  .nah(nah)
 								  );
 		
+sync		dat(.Clk(CLOCK_50),.d(PS2_DAT),.q(PS2_DAT_S));
+sync		clk(.Clk(CLOCK_50),.d(PS2_CLK),.q(PS2_CLK_S));
+
 keyboard 			kb_inst(.Clk(CLOCK_50),			// master clock
-								  .psClk(PS2_CLK),		// PS2 clock
-								  .psData(PS2_DAT),     // PS2 data signal (1 bit)
+								  .psClk(PS2_CLK_S),		// PS2 clock
+								  .psData(PS2_DAT_S),     // PS2 data signal (1 bit)
 								  .reset(Reset),	      // master reset
 							     .keyCode(keyData), 	// key that was pressed or released
-							     .press(press)    		// press=0 -> released, press=1 -> pressed
+							     .press(press),    		// press=0 -> released, press=1 -> pressed
+								  .byte1(byte1_i),
+								  .byte2(byte2_i),
+								  .check(check)
 							     );
+
+//ps2_keyboard	  key_inst(.clk(CLOCK_50),
+//								  .ps2_clk(PS2_CLK),
+//								  .ps2_data(PS2_DAT),
+//								  .ps2_code_new(press),
+//								  .ps2_code(keyData)
+//								  );
 									  
 key_reg				kr_inst(.Clk(CLOCK_50),			// master clock
 								  .Reset(Reset),			// master reset
@@ -132,7 +140,7 @@ audio_interface  	 	 AUD(.clk(CLOCK_50),    		   	// master clock
 								  );
 								  
 reg_32 			sample_reg(.Clk(CLOCK_50),
-								  .Reset(done || (data_over)),
+								  .Reset(done || (data_over) || waiting),
 								  .LD(tl_rdv),
 								  .byte_en(4'b1111),
 								  .Din(tl_rd),
@@ -173,7 +181,7 @@ fb_mapper		  fbm_inst(.Clk(CLOCK_50),
 								  .DrawY(drawy),
 								  .n_reg(n_reg),
 								  .is_fb(is_fb)
-								  );
+								  );								  
 								  
 color_mapper 		cm_inst(.DrawX(drawx),
 								  .DrawY(drawy),
@@ -187,7 +195,8 @@ color_mapper 		cm_inst(.DrawX(drawx),
 								  );
 								  
 note_reg 			nr_inst(.frame_clk(VGA_VS),
-								  .notes({sample[28],sample[24],sample[20],sample[16]}),
+								  .notes_in({sample[20],sample[16],sample[28],sample[24]}),
+								  .nah(nah),
 								  .n_reg(n_reg)
 								  );
 		
@@ -200,28 +209,29 @@ scorer 		  scorer_inst(.Clk(CLOCK_50),
 								  .ld_sc2(ld_sc2)
 								  );		
 		
-inc_10			  p1_score(.Clk(CLOCK_50), .ld(ld_sc1), .Reset(Reset), .inc(inc1), .Dout(p1_sc));
-inc_10			  p2_score(.Clk(CLOCK_50), .ld(ld_sc2), .Reset(Reset), .inc(inc2), .Dout(p2_sc));
+inc_10			  p1_score(.Clk(CLOCK_50), .ld(ld_sc1), .Reset(Reset|waiting), .inc(inc1), .Dout(p1_sc));
+inc_10			  p2_score(.Clk(CLOCK_50), .ld(ld_sc2), .Reset(Reset|waiting), .inc(inc2), .Dout(p2_sc));
 
 BCD					 p1_dec(.bin(p1_sc), .dec(p1_d));
 BCD					 p2_dec(.bin(p2_sc), .dec(p2_d));
-		
-hexdriver		  HEX_0(.In({3'b0,keyTrack[0]}), .Out(HEX0));
-hexdriver		  HEX_1(.In({3'b0,keyTrack[1]}), .Out(HEX1));							
-hexdriver		  HEX_2(.In({3'b0,keyTrack[2]}), .Out(HEX2));
-hexdriver		  HEX_3(.In({3'b0,keyTrack[3]}), .Out(HEX3));
-hexdriver		  HEX_4(.In({3'b0,keyTrack[4]}), .Out(HEX4));
-hexdriver		  HEX_5(.In({3'b0,keyTrack[5]}), .Out(HEX5));
-hexdriver		  HEX_6(.In({3'b0,keyTrack[6]}), .Out(HEX6));
-hexdriver		  HEX_7(.In({3'b0,keyTrack[7]}), .Out(HEX7));	
 
-//hexdriver		  HEX_0(.In(keyData[3:0]), .Out(HEX0));
-//hexdriver		  HEX_1(.In(keyData[7:4]), .Out(HEX1));							
-//hexdriver		  HEX_2(.In({3'b0,press}), .Out(HEX2));
-//hexdriver		  HEX_3(.In(4'b0), .Out(HEX3));
-//hexdriver		  HEX_4(.In(4'b0), .Out(HEX4));
-//hexdriver		  HEX_5(.In(4'b0), .Out(HEX5));
-//hexdriver		  HEX_6(.In(4'b0), .Out(HEX6));
-//hexdriver		  HEX_7(.In(4'b0), .Out(HEX7));		
+		
+//hexdriver		  HEX_0(.In({3'b0,keyTrack[0]}), .Out(HEX0));
+//hexdriver		  HEX_1(.In({3'b0,keyTrack[1]}), .Out(HEX1));							
+//hexdriver		  HEX_2(.In({3'b0,keyTrack[2]}), .Out(HEX2));
+//hexdriver		  HEX_3(.In({3'b0,keyTrack[3]}), .Out(HEX3));
+//hexdriver		  HEX_4(.In({3'b0,keyTrack[4]}), .Out(HEX4));
+//hexdriver		  HEX_5(.In({3'b0,keyTrack[5]}), .Out(HEX5));
+//hexdriver		  HEX_6(.In({3'b0,keyTrack[6]}), .Out(HEX6));
+//hexdriver		  HEX_7(.In({3'b0,keyTrack[7]}), .Out(HEX7));	
+
+hexdriver		  HEX_0(.In(keyData[3:0]), .Out(HEX0));
+hexdriver		  HEX_1(.In(keyData[7:4]), .Out(HEX1));							
+hexdriver		  HEX_2(.In({3'b0,press}), .Out(HEX2));
+hexdriver		  HEX_3(.In(4'b0), .Out(HEX3));
+hexdriver		  HEX_4(.In(byte1_o[3:0]), .Out(HEX4));
+hexdriver		  HEX_5(.In(byte1_o[7:4]), .Out(HEX5));
+hexdriver		  HEX_6(.In(byte2_o[3:0]), .Out(HEX6));
+hexdriver		  HEX_7(.In(byte2_o[7:4]), .Out(HEX7));		
 
 endmodule
